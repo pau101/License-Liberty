@@ -6,6 +6,7 @@ import com.google.common.collect.ImmutableList;
 import cpw.mods.modlauncher.api.IEnvironment;
 import cpw.mods.modlauncher.api.ITransformationService;
 import cpw.mods.modlauncher.api.ITransformer;
+import net.minecraftforge.fml.loading.moddiscovery.ModFileParser;
 import net.minecraftforge.forgespi.locating.IModFile;
 import net.minecraftforge.forgespi.locating.IModLocator;
 import net.minecraftforge.forgespi.locating.ModFileFactory;
@@ -74,33 +75,45 @@ public class LibertyTransformationService implements ITransformationService {
             return this.delegate;
         }
 
+        static class PrivateSecurityManager extends SecurityManager {
+            @Override
+            public Class<?>[] getClassContext() {
+                return super.getClassContext();
+            }
+        }
+
         @Override
         public Path findPath(final IModFile modFile, final String... path) {
             final Path p = super.findPath(modFile, path);
             //noinspection StringEquality
-            if (path.length == 2 && path[0] == "META-INF" && path[1] == "mods.toml") {
+            if (path.length == 2 && path[0] == "META-INF" && path[1] == "mods.toml" && ModFileParser.class.equals(new PrivateSecurityManager().getClassContext()[2])) {
                 return new ForwardingPath() {
                     @Override
                     protected Path delegate() {
-                        return p;
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public Path getFileName() {
+                        return p.getFileName();
                     }
 
                     @Override
                     public FileSystem getFileSystem() {
-                        final FileSystem fs = super.getFileSystem();
+                        final FileSystem fs = p.getFileSystem();
                         return new ForwardingFileSystem() {
                             @Override
                             protected FileSystem delegate() {
-                                return fs;
+                                throw new UnsupportedOperationException();
                             }
 
                             @Override
                             public FileSystemProvider provider() {
-                                final FileSystemProvider provider = super.provider();
+                                final FileSystemProvider provider = fs.provider();
                                 return new ForwardingFileSystemProvider() {
                                     @Override
                                     protected FileSystemProvider delegate() {
-                                        return provider;
+                                        throw new UnsupportedOperationException();
                                     }
 
                                     @Override
@@ -122,7 +135,7 @@ public class LibertyTransformationService implements ITransformationService {
                                                 return new ByteArrayInputStream(bytes);
                                             }
                                         }
-                                        return super.newInputStream(p, options);
+                                        return provider.newInputStream(p, options);
                                     }
                                 };
                             }
